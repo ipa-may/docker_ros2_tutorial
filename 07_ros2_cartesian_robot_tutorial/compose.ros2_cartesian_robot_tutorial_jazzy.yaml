@@ -1,0 +1,33 @@
+ # Note: Run `xhost +local:docker` on the host before starting this container
+
+name: docker-ros2-cartesian-robot-tutorial-jazzy
+services:
+  ros2_gui_jazzy:
+    #image: osrf/ros:jazzy-desktop
+    build:
+      context: .
+      dockerfile: ./Dockerfile-jazzy-cartesian-robot-tutorial
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    user: ros
+    group_add:
+      - video  # Access to /dev/dri
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+      # - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NVIDIA_VISIBLE_DEVICES=all
+      - GZ_SIM_SYSTEM_PLUGIN_PATH=/home/ros/ros2_ws/install/lib  
+      - XAUTHORITY=${XAUTHORITY}
+      - LIBGL_ALWAYS_SOFTWARE=1  
+      - MESA_GL_VERSION_OVERRIDE=3.3
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../src:/home/ros/ros2_ws/src
+    command: >
+      bash -c "source /opt/ros/jazzy/setup.bash && exec bash"
+

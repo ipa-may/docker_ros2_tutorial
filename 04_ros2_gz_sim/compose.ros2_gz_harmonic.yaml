@@ -1,0 +1,35 @@
+services:
+  harmonic:
+    image: althack/gz:harmonic-base
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=${XAUTHORITY}
+      - LIBGL_ALWAYS_SOFTWARE=1 # Force software rendering
+      - MESA_GL_VERSION_OVERRIDE=3.3
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    network_mode: host # Use host networking
+    stdin_open: true
+    tty: true
+    command: gz sim
+  harmonic-turtlebot4-ros:
+    build:
+      context: .
+      dockerfile: ./Dockerfile-jazzy-gz-sim-turtlebot4
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    user: ros
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+      # - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NVIDIA_VISIBLE_DEVICES=all
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../../src:/home/ros/ros2_ws/src
+    command: >
+      bash -c "source /opt/ros/jazzy/setup.bash && exec bash"

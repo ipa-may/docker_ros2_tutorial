@@ -1,0 +1,30 @@
+ # Note: Run `xhost +local:docker` on the host before starting this container
+
+name: docker-ros2-gui-jazzy
+services:
+  ros2_gui_jazzy:
+    #image: osrf/ros:jazzy-desktop
+    build:
+      context: .
+      dockerfile: ./Dockerfile-jazzy-gui
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    user: ros
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+      # - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NVIDIA_VISIBLE_DEVICES=all
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      # - CYCLONEDDS_URI=/cyclone_dds_shm.xml
+    # devices: # linux only
+    #  - /dev/dri:/dev/dri
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../../src:/home/ros/ros2_ws/src
+      - ../dds-configs/cyclone_dds_shm.xml:/home/ros/cyclone_dds_shm.xml
+    command: >
+      bash -c "source /opt/ros/jazzy/setup.bash && exec bash"
+

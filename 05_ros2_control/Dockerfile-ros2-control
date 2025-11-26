@@ -1,0 +1,87 @@
+FROM osrf/ros:jazzy-desktop-full
+
+RUN apt-get update \
+  && apt-get install -y \
+  nano \
+  vim \
+  && rm -rf /var/lib/apt/lists/*
+
+# Align container user/group with host IDs when provided
+ARG USERNAME=ros
+ARG USER_ID=1001
+ARG GROUP_ID=$USER_ID
+
+RUN EXISTING_GROUP=$(getent group "$GROUP_ID" | cut -d: -f1 || true) \
+ && if [ -n "$EXISTING_GROUP" ]; then \
+      echo "Using existing group $EXISTING_GROUP (gid $GROUP_ID)"; \
+      GROUP_NAME=$EXISTING_GROUP; \
+    elif getent group "$USERNAME" >/dev/null 2>&1; then \
+      groupmod --gid "$GROUP_ID" "$USERNAME"; \
+      GROUP_NAME=$USERNAME; \
+    else \
+      groupadd --gid "$GROUP_ID" "$USERNAME"; \
+      GROUP_NAME=$USERNAME; \
+    fi \
+ && EXISTING_USER=$(getent passwd "$USER_ID" | cut -d: -f1 || true) \
+ && if [ -n "$EXISTING_USER" ]; then \
+      echo "Reusing user $EXISTING_USER (uid $USER_ID)"; \
+      usermod --login "$USERNAME" --home /home/"$USERNAME" --move-home "$EXISTING_USER"; \
+      USER_NAME=$USERNAME; \
+    elif id -u "$USERNAME" >/dev/null 2>&1; then \
+      usermod --uid "$USER_ID" --gid "$GROUP_ID" "$USERNAME"; \
+      USER_NAME=$USERNAME; \
+    else \
+      useradd -s /bin/bash --uid "$USER_ID" --gid "$GROUP_ID" -m "$USERNAME"; \
+      USER_NAME=$USERNAME; \
+    fi \
+ && mkdir -p /home/"$USERNAME"/.config \
+ && chown "$USER_ID":"$GROUP_ID" /home/"$USERNAME"/.config
+
+
+
+# Ensure ros user can access ROS setup.bash by giving proper permissions
+RUN sudo chmod +rx /opt/ros/jazzy/setup.bash
+
+# Setup sudo: gives the user specified by USERNAME the sudo permissions
+RUN apt-get update \
+  && apt-get install -y \
+  && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME\
+  && chmod 0440 /etc/sudoers.d/$USERNAME \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
+  libi2c-dev \
+  python3-colcon-common-extensions \
+  ros-${ROS_DISTRO}-ros2-control \
+  ros-${ROS_DISTRO}-ros2-controllers \
+  ros-${ROS_DISTRO}-hardware-interface \
+  ros-${ROS_DISTRO}-hardware-interface-testing \
+  ros-${ROS_DISTRO}-controller-manager \
+  ros-${ROS_DISTRO}-velocity-controllers \
+  ros-${ROS_DISTRO}-joint-state-broadcaster \
+  ros-${ROS_DISTRO}-robot-state-publisher \
+  ros-${ROS_DISTRO}-joint-state-publisher-gui \
+  ros-${ROS_DISTRO}-xacro \
+  ros-${ROS_DISTRO}-tf2 \
+  ros-${ROS_DISTRO}-tf2-msgs \
+  ros-${ROS_DISTRO}-rviz2 \
+  ros-${ROS_DISTRO}-plotjuggler-ros \
+  && rm -rf /var/lib/apt/lists/*
+
+
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+RUN mkdir -p ~/ros2_ws/src
+
+WORKDIR /home/$USERNAME/ros2_ws/src
+
+COPY entrypoint_ros2_control.sh /entrypoint.sh
+COPY bashrc /home/$USERNAME/.bashrc
+
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+
+CMD ["bash"]
+
+USER root

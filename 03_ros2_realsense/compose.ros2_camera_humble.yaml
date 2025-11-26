@@ -1,0 +1,30 @@
+name: docker-ros2-camera-humble
+services:
+  ros2_camera:
+    build:
+      context: .
+      dockerfile: ./Dockerfile-humble-realsense
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    user: ros
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../src:/home/ros/ros2_ws/src
+      - /dev:/dev
+    device_cgroup_rules:
+      - 'c 81:* rmw'
+      - 'c 189:* rmw'
+    command:
+      - bash
+      - -c
+      - |
+        source "/opt/ros/humble/setup.bash"
+        ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true
+

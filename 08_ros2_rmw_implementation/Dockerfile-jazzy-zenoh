@@ -1,0 +1,69 @@
+FROM osrf/ros:jazzy-desktop-full
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash","-lc"]
+
+# --- Base tools ---
+RUN apt-get update \
+ && apt-get install -y nano vim \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- Non-root user ---
+ARG USERNAME=ros
+ARG USER_ID=1001
+ARG GROUP_ID=${USER_ID}
+RUN groupadd --gid ${GROUP_ID} ${USERNAME} \
+ && useradd -s /bin/bash --uid ${USER_ID} --gid ${GROUP_ID} -m ${USERNAME} \
+ && mkdir -p /home/${USERNAME}/.config \
+ && chown -R ${USER_ID}:${GROUP_ID} /home/${USERNAME}
+
+# Ensure ROS setup is readable/executable (no sudo in Dockerfile)
+RUN chmod +rx /opt/ros/jazzy/setup.bash
+
+# (Optional) sudo for interactive use inside the container
+# If you don't need sudo at runtime, you can delete this whole block.
+RUN apt-get update \
+ && apt-get install -y sudo \
+ && echo "${USERNAME} ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
+ && chmod 0440 /etc/sudoers.d/${USERNAME} \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- ROS dev tools / packages ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
+  libi2c-dev \
+  python3-colcon-common-extensions \
+  ros-${ROS_DISTRO}-rmw-zenoh-cpp \
+  ros-${ROS_DISTRO}-hardware-interface \
+  ros-${ROS_DISTRO}-hardware-interface-testing \
+  ros-${ROS_DISTRO}-controller-manager \
+  ros-${ROS_DISTRO}-velocity-controllers \
+  ros-${ROS_DISTRO}-joint-state-broadcaster \
+  ros-${ROS_DISTRO}-robot-state-publisher \
+  ros-${ROS_DISTRO}-joint-state-publisher-gui \
+  ros-${ROS_DISTRO}-xacro \
+  ros-${ROS_DISTRO}-tf2 \
+  ros-${ROS_DISTRO}-tf2-msgs \
+  ros-${ROS_DISTRO}-rviz2 \
+  ros-${ROS_DISTRO}-plotjuggler-ros \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy files that require root permissions first, and make executable
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Switch to non-root user for workspace work
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+# Create workspace (now ~ expands to /home/${USERNAME})
+RUN mkdir -p /home/${USERNAME}/ros2_ws/src
+
+WORKDIR /home/${USERNAME}/ros2_ws/src
+
+# User-owned bashrc
+COPY bashrc /home/${USERNAME}/.bashrc
+
+# Default runtime as non-root user
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+CMD ["bash"]

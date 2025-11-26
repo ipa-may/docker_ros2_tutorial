@@ -1,0 +1,44 @@
+FROM ros:humble-perception
+
+ENV WS_DIR="/ros2_ws"
+WORKDIR ${WS_DIR}
+
+SHELL ["/bin/bash", "-c"]
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+   && apt-get install -y \
+   build-essential \
+   cmake \
+   git-all \
+   software-properties-common \
+   && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+ARG USERNAME=ros
+ARG USER_ID=1001
+ARG GROUP_ID=$USER_ID
+
+RUN groupadd --gid $GROUP_ID $USERNAME \
+   && useradd -s /bin/bash --uid $USER_ID --gid $GROUP_ID -m $USERNAME \
+   && mkdir /home/$USERNAME/.config && chown $USER_ID:$GROUP_ID /home/$USERNAME/.config
+
+# Ensure ros user can access ROS setup.bash by giving proper permissions
+RUN sudo chmod +rx /opt/ros/humble/setup.bash
+
+COPY ../entrypoint.sh /entrypoint.sh
+COPY ../bashrc /home/$USERNAME/.bashrc
+
+RUN apt-get update \
+   && apt-get install -y \
+   ros-${ROS_DISTRO}-librealsense2* \
+   ros-${ROS_DISTRO}-realsense2-* \
+   && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update \
+   && apt-get install -y \
+   ros-${ROS_DISTRO}-rviz2 \
+   && rm -rf /var/lib/apt/lists/*
+
+ARG DEBIAN_FRONTEND=dialog

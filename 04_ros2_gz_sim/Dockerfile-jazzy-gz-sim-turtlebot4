@@ -1,0 +1,100 @@
+FROM osrf/ros:jazzy-desktop-full
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash","-lc"]
+
+# --- Base tools ---
+RUN apt-get update && apt-get install -y \
+    nano vim git lsb-release wget gnupg ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Non-root user ---
+ARG USERNAME=ros
+ARG USER_ID=1001
+ARG GROUP_ID=${USER_ID}
+RUN groupadd --gid ${GROUP_ID} ${USERNAME} \
+    && useradd -s /bin/bash --uid ${USER_ID} --gid ${GROUP_ID} -m ${USERNAME} \
+    && mkdir -p /home/${USERNAME}/.config \
+    && chown -R ${USER_ID}:${GROUP_ID} /home/${USERNAME}
+
+# Ensure ROS setup is readable
+RUN chmod +rx /opt/ros/jazzy/setup.bash
+
+# --- Gazebo (gz) Harmonic repo + install ---
+ARG GZ_VERSION=harmonic
+ENV GZ_VERSION=${GZ_VERSION}
+RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+    | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y "gz-${GZ_VERSION}" \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- ROS dev tools & useful packages ---
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-pip \
+    python3-rosdep \
+    python3-colcon-common-extensions \
+    ros-${ROS_DISTRO}-ros-gz \
+    ros-${ROS_DISTRO}-teleop-twist-keyboard \
+    ros-${ROS_DISTRO}-desktop \
+    emacs htop byobu less \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- rosdep init/update (must be root) ---
+RUN rosdep init || true
+RUN rosdep update
+
+# --- Workspaces (root creates, user owns) ---
+RUN mkdir -p /home/${USERNAME}/turtlebot_ws/src /home/${USERNAME}/ros2_ws/src \
+    && chown -R ${USER_ID}:${GROUP_ID} /home/${USERNAME}/turtlebot_ws /home/${USERNAME}/ros2_ws
+
+# --- Clone sources ---
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}/turtlebot_ws/src
+# TB4 core (contains turtlebot4_msgs, etc.) + simulator
+RUN git clone https://github.com/turtlebot/turtlebot4 -b ${ROS_DISTRO} \
+    && git clone https://github.com/turtlebot/turtlebot4_simulator -b ${ROS_DISTRO}
+
+# --- Preinstall known deps that rosdep looks for as APT packages ---
+USER root
+RUN apt-get update && apt-get install -y \
+    ros-${ROS_DISTRO}-turtlebot4-desktop \
+    ros-${ROS_DISTRO}-slam-toolbox \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Resolve remaining apt dependencies with rosdep ---
+WORKDIR /home/${USERNAME}/turtlebot_ws
+# Important: apt-get update right before rosdep so cache is fresh
+RUN apt-get update \
+    && source /opt/ros/${ROS_DISTRO}/setup.bash \
+    && rosdep install -y --from-paths src --ignore-src --rosdistro ${ROS_DISTRO}
+
+# (Alternative if you prefer not to preinstall)
+# RUN apt-get update \
+#  && source /opt/ros/${ROS_DISTRO}/setup.bash \
+#  && rosdep install -y --from-paths src --ignore-src --rosdistro ${ROS_DISTRO} \
+#     --skip-keys "turtlebot4-viz slam-toolbox"
+
+# --- Build workspace as non-root user ---
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}/turtlebot_ws
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
+    && colcon build --symlink-install
+
+# --- Secondary workspace placeholder ---
+WORKDIR /home/${USERNAME}/ros2_ws
+
+# --- Entrypoint & shell config ---
+USER root
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+COPY bashrc /home/${USERNAME}/.bashrc
+RUN chown ${USER_ID}:${GROUP_ID} /home/${USERNAME}/.bashrc
+
+# --- Default runtime as non-root user ---
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
+CMD ["bash"]
