@@ -1,5 +1,21 @@
 # Dev-containers for ROS 2 development
 
+Important Notes
+
+- Depending on your Linux user ID, you may need to modify the Dockerfile user setting, for example:
+
+```Dockerfile
+ARG USER_ID=1000
+```
+
+- Check your user ID on Linux with:
+
+```bash
+id
+```
+
+- If your UID is different, update the `ARG USER_ID=...` value in the relevant Dockerfile to match it.
+
 ## 1. Reasons to use Docker for robotics development
 
 1. Running incompatible libraries and OS.
