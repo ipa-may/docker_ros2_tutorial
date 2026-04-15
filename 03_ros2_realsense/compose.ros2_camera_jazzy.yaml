@@ -8,10 +8,14 @@ services:
     tty: true
     network_mode: host
     ipc: host
+    privileged: true
     user: ros
     environment:
       - DISPLAY=$DISPLAY
       - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=5
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - ROS_LOCALHOST_ONLY=0
     devices:
       - /dev/dri:/dev/dri
     volumes:
@@ -26,5 +30,11 @@ services:
       - -c
       - |
         source "/opt/ros/jazzy/setup.bash"
-        ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true
-
+        ros2 launch realsense2_camera rs_launch.py \
+          align_depth.enable:=true \
+          pointcloud.enable:=false \
+          depth_module.profile:=640x480x15 \
+          rgb_camera.profile:=640x480x15 \
+          enable_infra1:=false \
+          enable_infra2:=false
+ 

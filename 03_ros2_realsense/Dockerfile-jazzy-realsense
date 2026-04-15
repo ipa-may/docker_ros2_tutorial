@@ -17,15 +17,27 @@ RUN apt-get update \
 
 # Create a non-root user
 ARG USERNAME=ros
-ARG USER_ID=1001
+ARG USER_ID=1000
 ARG GROUP_ID=$USER_ID
 
-RUN groupadd --gid $GROUP_ID $USERNAME \
-   && useradd -s /bin/bash --uid $USER_ID --gid $GROUP_ID -m $USERNAME \
-   && mkdir /home/$USERNAME/.config && chown $USER_ID:$GROUP_ID /home/$USERNAME/.config
+RUN set -eux; \
+   if ! getent group "${GROUP_ID}" >/dev/null; then \
+      groupadd --gid "${GROUP_ID}" "${USERNAME}"; \
+   fi; \
+   if id -u "${USERNAME}" >/dev/null 2>&1; then \
+      usermod --uid "${USER_ID}" --gid "${GROUP_ID}" "${USERNAME}"; \
+   elif getent passwd "${USER_ID}" >/dev/null; then \
+      EXISTING_USER="$(getent passwd "${USER_ID}" | cut -d: -f1)"; \
+      usermod --login "${USERNAME}" --home "/home/${USERNAME}" --move-home "${EXISTING_USER}"; \
+      usermod --gid "${GROUP_ID}" "${USERNAME}"; \
+   else \
+      useradd -s /bin/bash --uid "${USER_ID}" --gid "${GROUP_ID}" -m "${USERNAME}"; \
+   fi; \
+   mkdir -p "/home/${USERNAME}/.config"; \
+   chown -R "${USER_ID}:${GROUP_ID}" "/home/${USERNAME}"
 
 # Ensure ros user can access ROS setup.bash by giving proper permissions
-RUN sudo chmod +rx /opt/ros/jazzy/setup.bash
+RUN chmod +rx /opt/ros/jazzy/setup.bash
 
 COPY ../entrypoint.sh /entrypoint.sh
 COPY ../bashrc /home/$USERNAME/.bashrc
@@ -42,3 +54,4 @@ RUN apt-get update \
    && rm -rf /var/lib/apt/lists/*
 
 ARG DEBIAN_FRONTEND=dialog
+ 
