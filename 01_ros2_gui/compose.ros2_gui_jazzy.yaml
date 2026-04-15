@@ -17,8 +17,9 @@ services:
       - QT_X11_NO_MITSHM=1
       # - NVIDIA_DRIVER_CAPABILITIES=all
       # - NVIDIA_VISIBLE_DEVICES=all
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      # - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       # - CYCLONEDDS_URI=/cyclone_dds_shm.xml
+      - ROS_DOMAIN_ID=5
     # devices: # linux only
     #  - /dev/dri:/dev/dri
     volumes:
