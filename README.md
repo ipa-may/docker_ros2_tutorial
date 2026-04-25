@@ -1,6 +1,8 @@
 # Dev-containers for ROS 2 development
 
-Important Notes
+For a step-by-step explanation of the repository, start with [tutorial_readme.md](./tutorial_readme.md).
+
+## Important Notes
 
 - Depending on your Linux user ID, you may need to modify the Dockerfile user setting, for example:
 
@@ -15,21 +17,25 @@ id
 ```
 
 - If your UID is different, update the `ARG USER_ID=...` value in the relevant Dockerfile to match it.
+- The Dockerfiles in this repository are intentionally written as single-stage Dockerfiles. They are not optimized as multi-stage builds on purpose, because the goal is to keep them easy to read and explain while learning the basic Dockerfile instructions first.
 
 ## 1. Reasons to use Docker for robotics development
 
-1. Running incompatible libraries and OS.
-2. Useful for using NVidia Jetsons. NVidia provides IDE Jetpack. Possible to use Jetpack with docker and any version of ROS necessary
-3. Standardised a development environment: same tools and libraries4. Infrastructure as code: using code to define the environments
-4. Cloud development: example for nav2
+1. Run software stacks with incompatible libraries or operating system requirements.
+2. Work with NVIDIA Jetson platforms while keeping ROS 2 versions and dependencies under control.
+3. Standardize the development environment so the same tools and libraries are available for everyone.
+4. Infrastructure as code: using code to define the environments.
+5. Cloud development: for example for Nav2 or remote development setups.
 
-## 2. How to Use this repository
+## 2. How to Use This Repository
 
-To use the GUI setup with ROS 2, follow these steps:
+This repository contains small ROS 2 Docker and Docker Compose examples for different learning scenarios such as GUI tools, cameras, simulation, ros2_control, Universal Robots, and middleware experiments.
+
+To use one of the examples, follow these steps:
 
 ### 2.1. Build the Docker image
 
-To build the Docker image for ROS 2 with GUI support, use the following command:
+To build the Docker image for a selected tutorial environment, use the following command:
 
 ```sh
 docker compose -f 01_ros2_gui/compose.ros2_gui_$ROS-DISTRO$.yaml build
@@ -37,7 +43,7 @@ docker compose -f 01_ros2_gui/compose.ros2_gui_$ROS-DISTRO$.yaml build
 
 Replace `$ROS-DISTRO$` with the desired ROS 2 distribution (e.g., `humble`, `jazzy`).
 
-The build context for Docker is docker/.
+The image is built from the Dockerfile that lives inside the selected tutorial folder.
 
 ### 2.2 Run the Docker container
 
@@ -57,7 +63,9 @@ docker compose -f 07_ros2_cartesian_robot_tutorial/compose.ros2_cartesian_robot_
 docker compose -f 07_ros2_cartesian_robot_tutorial/compose.ros2_cartesian_robot_tutorial_jazzy.yaml up
 ```
 
-This will start a Docker container configured for ROS 2 with GUI support. The container uses the `Dockerfile-humble-entrypoint` to build the image and mounts the `src` directory to `/home/ros/ros2_ws/src` inside the container.
+This will start the selected ROS 2 development container. The selected compose file uses the Dockerfile from that tutorial folder and mounts the local `src/` directory to `/home/ros/ros2_ws/src` inside the container.
+
+Most examples follow the same pattern: one folder contains a Dockerfile, a compose file, and helper files such as `entrypoint.sh` and `bashrc`.
 
 #### Important Notes
 
@@ -68,7 +76,7 @@ This will start a Docker container configured for ROS 2 with GUI support. The co
 
 ### 2.3 Develop using your container
 
-To develop using the container, open VS Code and work from the local `/src` directory. This directory is bound to `/home/ros/ros2_ws/src` inside the container, ensuring your local changes are reflected within the container.
+To develop using the container, open VS Code and work from the local `src/` directory in the repository root. This directory is bound to `/home/ros/ros2_ws/src` inside the container, ensuring your local changes are reflected within the container.
 
 #### Building and Running
 
@@ -79,7 +87,7 @@ colcon build --symlink-install --packages-select <your-package>
 source install/setup.bash
 ```
 
-**realtime enabled:**
+**Realtime-enabled service:**
 
 ```sh
 docker compose -f 05_ros2_control/compose.ros2_control.yaml up ros2_control_demos_custom_rt
@@ -88,9 +96,94 @@ docker compose -f 05_ros2_control/compose.ros2_control.yaml up ros2_control_demo
 
 This setup allows you to leverage all your VS Code extensions while developing in a standardized environment.
 
-## 3. How to add Docker images to this repository?
+## 3. How to Customize the Images
 
-## 4. List of usable dev containters with tutorials
+The easiest way to customize an image is to edit the Dockerfile in the tutorial folder you want to use.
+
+### 3.1 Add packages to the image
+
+If you want additional Ubuntu or ROS 2 packages, add them to the `apt-get install` section of the Dockerfile. For example:
+
+```Dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  python3-colcon-common-extensions \
+  ros-${ROS_DISTRO}-plotjuggler-ros \
+  git \
+  && rm -rf /var/lib/apt/lists/*
+```
+
+After changing the Dockerfile, rebuild the image:
+
+```bash
+docker compose -f 01_ros2_gui/compose.ros2_gui_humble.yaml build
+```
+
+If Docker still reuses an old cached layer, rebuild with:
+
+```bash
+docker compose -f 01_ros2_gui/compose.ros2_gui_humble.yaml build --no-cache
+```
+
+### 3.2 Add Python packages
+
+If you need Python packages, install them in the Dockerfile as well so the environment remains reproducible:
+
+```Dockerfile
+RUN pip install <package-name>
+```
+
+Add your dependencies explicitly to the Dockerfile instead of installing them manually each time in a running container.
+
+### 3.3 Customize the mounted workspace
+
+Most compose files bind-mount a local `src` directory into:
+
+```bash
+/home/ros/ros2_ws/src
+```
+
+This means you keep editing code on the host machine, while the container builds and runs it.
+
+You can add more bind-mounts in the compose file if you want to share other folders with the container, for example configuration files, datasets, or logs:
+
+```yaml
+volumes:
+  - ../src:/home/ros/ros2_ws/src
+  - ../my-config:/home/ros/config
+```
+
+Use bind-mounts for files that change often. Use the Dockerfile for software that should always be present in the image.
+
+### 3.4 Customize users and permissions
+
+All Dockerfiles in this repository define:
+
+```Dockerfile
+ARG USER_ID=1001
+ARG GROUP_ID=$USER_ID
+```
+
+This helps align the container user with your Linux user. If file permissions are wrong in the mounted workspace, rebuild the image with your own UID and GID:
+
+```bash
+docker compose -f 05_ros2_control/compose.ros2_control.yaml build \
+  --build-arg USER_ID=$(id -u) \
+  --build-arg GROUP_ID=$(id -g)
+```
+
+### 3.5 Create your own variant
+
+If you want to keep the original tutorial unchanged, copy one existing folder and adapt it to your own use case. This is a simple workflow:
+
+1. Copy the closest tutorial folder.
+2. Rename the Dockerfile and compose file.
+3. Add or remove packages step by step.
+4. Rebuild and test after each small change.
+
+This makes it easier to understand what each Dockerfile instruction does.
+
+
+## 4. Available Tutorial Environments
 
 ```
 01_ros2_gui/
@@ -102,69 +195,15 @@ This setup allows you to leverage all your VS Code extensions while developing i
 08_ros2_rmw_implementation/
 ```
 
-Tools:
-
-- Rviz
-- Plotjuggler
-- Gazebo harmonics with cartesian robot example (gantry)
-- ros2 control
-- Realsense with ROS 2 and opencv bridges with simple examples
-- Zenoh setup
-
-Todo:
-
-- BT Tree with simple examples
-- nav2
-
-- tesseract
-
-- PDDL and PlanSys2 : <https://github.com/fjrodl/PDDL-course>
-  <https://kas-lab.github.io/mirte_playground/mirte_pddl.html>
-
-- Trainings: Turtlebot4 :
-  TODO: Docker images: <https://github.com/IntelligentRoboticsLabs/docker_infrastructure/tree/main>
-
-- Training: Manipulation : <https://gitlab.cc-asp.fraunhofer.de/ipa326/manipulation_training>
-
-- Training: DDS
-
-- Convince : <https://convince-project.github.io/AS2FM/installation.html>
 
 ## GZ Sim
 
 ```bash
-docker compose -f compose.ros2_gz_harmonic.yaml up
-```
-
-## Realsense
-
-### Launch
-
-```bash
-docker compose -f compose.ros2_camera.yaml up
-```
-
-### Installatino
-
-Test the realsense:
-
-Install the realsense SDK:
-
-```bash
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key F6B0FC61
-sudo add-apt-repository "deb http://realsense-hw-public.s3.amazonaws.com/Debian/apt-repo $(lsb_release -cs) main"
-sudo apt update
-sudo apt install librealsense2-utils
-```
-
-Run the viewer:
-
-```bash
-realsense-viewer
+docker compose -f 04_ros2_gz_sim/compose.ros2_gz_harmonic.yaml up
 ```
 
 
-## Build the image with other UID and GUID
+## Build an Image with a Different UID and GID
 
 ```sh
 # build
