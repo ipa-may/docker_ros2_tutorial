@@ -116,6 +116,41 @@ In this repository:
 - `docker compose ... build` creates the image
 - `docker compose ... up` starts the container
 
+### 5.1 Common ROS Base Image Variants
+
+The official ROS Docker images use tags such as `ros:<distro>-desktop` or `ros:<distro>-perception`.
+These tags map to ROS 2 package variants, so the suffix tells you roughly how much software is preinstalled.
+
+- `ros-<DISTRO>-core`
+  - the smallest ROS 2 runtime image
+  - contains the core communication and launch system packages needed to run basic ROS 2 nodes
+  - good for minimal or headless containers
+
+- `ros-<DISTRO>-base`
+  - includes everything from `core`
+  - adds commonly used robotics libraries such as transforms, robot description support, and related runtime tools
+  - typically still avoids GUI-heavy desktop packages
+
+- `ros-<DISTRO>-perception`
+  - includes everything from `base`
+  - adds common perception packages for images, cameras, OpenCV integration, point clouds, and laser processing
+  - useful for camera and sensing workflows such as the RealSense tutorial
+
+- `ros-<DISTRO>-desktop`
+  - includes everything from `base`
+  - adds common desktop-side ROS 2 tools and examples such as RViz, RQt plugins, demo nodes, and teleoperation utilities
+  - useful when you want visualization and a more complete interactive ROS 2 environment
+
+In practical terms, you can think of them like this:
+
+- `core` = minimal ROS 2
+- `base` = minimal ROS 2 plus common robot libraries
+- `perception` = `base` plus camera and point cloud tooling
+- `desktop` = `base` plus visualization and desktop tools
+
+Many Dockerfiles in this repository build from `desktop-full`, which is even larger than `desktop`.
+`desktop-full` adds stacks such as perception and simulation on top of `desktop`.
+
 ## 6. How the Workspace Is Shared with the Container
 
 Most examples mount a local folder called `src/` into the container:
@@ -373,37 +408,3 @@ docker compose -f 01_ros2_gui/compose.ros2_gui_humble.yaml build \
   --build-arg USER_ID=$(id -u) \
   --build-arg GROUP_ID=$(id -g)
 ```
-
-## 14. A simple mental model for the whole repository
-
-If the repository still feels abstract, think of each tutorial folder like this:
-
-- one folder = one prepared lab bench
-- Dockerfile = how the lab bench is assembled
-- Compose file = how the lab bench is started
-- `src/` = the place where you put your own experiment
-
-## 15. Recommended Path Through the Material
-
-This order makes sense:
-
-1. start with `01_ros2_gui`
-2. understand how `Dockerfile-*` and `compose.*.yaml` work together
-3. create and mount your own `src/` workspace
-4. build a simple ROS 2 package with `colcon`
-5. move to a more specific tutorial such as `05_ros2_control` or `04_ros2_gz_sim`
-
-## 16. Final Recap
-
-This repository is not just a collection of Dockerfiles.
-It is a set of small, reusable ROS 2 learning environments.
-
-The key takeaway is:
-
-- pick one tutorial folder
-- build the image
-- start the container
-- edit code in `src/`
-- build and run ROS 2 inside the container
-
-Once that mental model is clear, the rest of the repository becomes much easier to understand.
