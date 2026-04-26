@@ -1,0 +1,30 @@
+# Note: Run `xhost +local:docker` on the host before starting this container
+name: docker-moveit-setup-assistant-humble
+services:
+  moveit_setup_assistant_humble:
+    build:
+      context: ..
+      dockerfile: 02_moveit_setup_assistant_humble/Dockerfile
+      args:
+        ROS_DISTRO: humble
+        USER_ID: ${ROS_USER_ID:-1001}
+        GROUP_ID: ${ROS_GROUP_ID:-1001}
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    user: ros
+    working_dir: /home/ros/ros2_ws
+    environment:
+      - DISPLAY=$DISPLAY
+      - QT_X11_NO_MITSHM=1
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - type: bind
+        source: ../src
+        target: /home/ros/ros2_ws/src
+        bind:
+          create_host_path: false
+    command: "bash -c 'source /opt/ros/humble/setup.bash && exec $SHELL'"
