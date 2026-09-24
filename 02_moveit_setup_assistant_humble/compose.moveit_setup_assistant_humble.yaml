@@ -3,8 +3,8 @@ name: docker-moveit-setup-assistant-humble
 services:
   moveit_setup_assistant_humble:
     build:
-      context: ..
-      dockerfile: 02_moveit_setup_assistant_humble/Dockerfile
+      context: .
+      dockerfile: Dockerfile
       args:
         ROS_DISTRO: humble
         USER_ID: ${ROS_USER_ID:-1001}
